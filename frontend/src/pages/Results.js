@@ -10,20 +10,55 @@ const BADGE_STYLES = {
   MEDIUM: { background: '#FFFBF0', color: '#854F0B' },
   LOW: { background: '#F0FAF5', color: '#0F6E56' },
 };
-const RISK_DESCRIPTIONS = {
-  HIGH: {
-    title: 'High risk',
-    description: 'This module shows the strongest warning signs and should be reviewed first. High-risk modules are more likely to contain defects or become harder to maintain as the codebase grows.',
-  },
-  MEDIUM: {
-    title: 'Medium risk',
-    description: 'This module has some caution signals, but it is not the most urgent area. It is a good candidate for cleanup, extra testing, or closer monitoring in upcoming changes.',
-  },
-  LOW: {
-    title: 'Low risk',
-    description: 'This module currently looks relatively stable compared with the others in this analysis. It still deserves normal testing, but it is less likely to need immediate attention.',
-  },
-};
+
+function formatNumber(value) {
+  return typeof value === 'number' ? value.toFixed(2).replace(/\.00$/, '') : value;
+}
+
+function getRiskExplanation(results, row) {
+  const totalBugCount = results.reduce((sum, item) => sum + (Number(item.bug_count) || 0), 0);
+  const usesComplexity = totalBugCount === 0;
+  const complexityValues = results.map((item) => Number(item.complexity_score) || 0);
+  const maxComplexity = complexityValues.length ? Math.max(...complexityValues) : 0;
+  const minComplexity = complexityValues.length ? Math.min(...complexityValues) : 0;
+  const rowComplexity = Number(row.complexity_score) || 0;
+  const priority = Number(row.priority_score) || 0;
+  const severity = Number(row.severity_score) || 0;
+  const reopenCount = Number(row.reopen_count) || 0;
+  const bugCount = Number(row.bug_count) || 0;
+
+  if (usesComplexity) {
+    let comparison = 'in the middle of the modules analyzed';
+    if (rowComplexity === maxComplexity) comparison = 'the highest in this analysis';
+    else if (rowComplexity === minComplexity) comparison = 'among the lowest in this analysis';
+
+    const parts = [
+      `This result was labeled ${row.risk_level} mainly because this Git analysis had no bug history, so the app ranked modules by code complexity.`,
+      `This module's complexity score is ${formatNumber(rowComplexity)}, which is ${comparison}.`,
+    ];
+
+    if (typeof row.max_complexity === 'number') {
+      parts.push(`Its highest single code block complexity is ${formatNumber(row.max_complexity)}.`);
+    }
+
+    return {
+      title: `${row.risk_level} because of complexity`,
+      description: parts.join(' '),
+    };
+  }
+
+  const factors = [];
+  if (bugCount > 0) factors.push(`bug count ${bugCount}`);
+  if (priority > 0) factors.push(`priority score ${formatNumber(priority)}`);
+  if (severity > 0) factors.push(`severity score ${formatNumber(severity)}`);
+  if (reopenCount > 0) factors.push(`reopen count ${reopenCount}`);
+  if (rowComplexity > 0) factors.push(`complexity score ${formatNumber(rowComplexity)}`);
+
+  return {
+    title: `${row.risk_level} from scoring factors`,
+    description: `This result was assigned by clustering modules using bug count, priority, severity, reopen count, and complexity, then labeling the clusters by risk. For this module, the main contributing values are ${factors.join(', ')}.`,
+  };
+}
 
 export default function Results() {
   const { id } = useParams();
@@ -73,7 +108,7 @@ export default function Results() {
     { name: 'LOW', value: summary.low_count, fill: '#1D9E75' },
   ].filter(d => d.value > 0);
   const barData = [...results].sort((a, b) => b.bug_count - a.bug_count).slice(0, 15);
-  const selectedRiskInfo = selectedRisk ? RISK_DESCRIPTIONS[selectedRisk.risk_level] : null;
+  const selectedRiskInfo = selectedRisk ? getRiskExplanation(results, selectedRisk) : null;
 
   return (
     <Layout>
@@ -205,7 +240,7 @@ export default function Results() {
               </div>
               <p style={styles.modalText}>{selectedRiskInfo.description}</p>
               <p style={styles.modalText}>
-                This module has priority score <strong>{selectedRisk.priority_score}</strong>, severity score <strong>{selectedRisk.severity_score}</strong>, bug count <strong>{selectedRisk.bug_count}</strong>, and reopen count <strong>{selectedRisk.reopen_count}</strong>.
+                This module has priority score <strong>{selectedRisk.priority_score}</strong>, severity score <strong>{selectedRisk.severity_score}</strong>, bug count <strong>{selectedRisk.bug_count}</strong>, reopen count <strong>{selectedRisk.reopen_count}</strong>{typeof selectedRisk.complexity_score === 'number' && <> , and complexity score <strong>{formatNumber(selectedRisk.complexity_score)}</strong></>}.
               </p>
             </div>
           </div>
