@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     AZURE_CLIENT_SECRET: Optional[str] = None
     POWERBI_WORKSPACE_ID: Optional[str] = None
     POWERBI_DATASET_ID: Optional[str] = None
+    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
 
     class Config:
         env_file = ".env"
