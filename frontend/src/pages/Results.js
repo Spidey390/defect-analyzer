@@ -10,6 +10,20 @@ const BADGE_STYLES = {
   MEDIUM: { background: '#FFFBF0', color: '#854F0B' },
   LOW: { background: '#F0FAF5', color: '#0F6E56' },
 };
+const RISK_DESCRIPTIONS = {
+  HIGH: {
+    title: 'High risk',
+    description: 'This module shows the strongest warning signs and should be reviewed first. High-risk modules are more likely to contain defects or become harder to maintain as the codebase grows.',
+  },
+  MEDIUM: {
+    title: 'Medium risk',
+    description: 'This module has some caution signals, but it is not the most urgent area. It is a good candidate for cleanup, extra testing, or closer monitoring in upcoming changes.',
+  },
+  LOW: {
+    title: 'Low risk',
+    description: 'This module currently looks relatively stable compared with the others in this analysis. It still deserves normal testing, but it is less likely to need immediate attention.',
+  },
+};
 
 export default function Results() {
   const { id } = useParams();
@@ -19,6 +33,7 @@ export default function Results() {
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
   const [error, setError] = useState('');
+  const [selectedRisk, setSelectedRisk] = useState(null);
 
   useEffect(() => {
     analysisAPI.getAnalysis(id)
@@ -58,6 +73,7 @@ export default function Results() {
     { name: 'LOW', value: summary.low_count, fill: '#1D9E75' },
   ].filter(d => d.value > 0);
   const barData = [...results].sort((a, b) => b.bug_count - a.bug_count).slice(0, 15);
+  const selectedRiskInfo = selectedRisk ? RISK_DESCRIPTIONS[selectedRisk.risk_level] : null;
 
   return (
     <Layout>
@@ -148,7 +164,16 @@ export default function Results() {
                 <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
                   <td style={{ ...styles.td, fontWeight: 500 }}>{r.module}</td>
                   <td style={styles.td}>
-                    <span style={{ ...styles.badge, ...BADGE_STYLES[r.risk_level] }}>{r.risk_level}</span>
+                    <div style={styles.riskCell}>
+                      <span style={{ ...styles.badge, ...BADGE_STYLES[r.risk_level] }}>{r.risk_level}</span>
+                      <button
+                        type="button"
+                        style={styles.riskInfoBtn}
+                        onClick={() => setSelectedRisk(r)}
+                      >
+                        Why?
+                      </button>
+                    </div>
                   </td>
                   <td style={styles.td}>{r.bug_count}</td>
                   <td style={styles.td}>{r.priority_score}</td>
@@ -161,6 +186,31 @@ export default function Results() {
           </table>
         </div>
       </div>
+
+      {selectedRisk && selectedRiskInfo && (
+        <div style={styles.modalOverlay} onClick={() => setSelectedRisk(null)}>
+          <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <div>
+                <div style={styles.modalEyebrow}>Risk explanation</div>
+                <h2 style={styles.modalTitle}>{selectedRisk.module}</h2>
+              </div>
+              <button type="button" style={styles.modalCloseBtn} onClick={() => setSelectedRisk(null)}>Close</button>
+            </div>
+
+            <div style={styles.modalBody}>
+              <div style={styles.modalRiskRow}>
+                <span style={{ ...styles.badge, ...BADGE_STYLES[selectedRisk.risk_level] }}>{selectedRisk.risk_level}</span>
+                <span style={styles.modalRiskTitle}>{selectedRiskInfo.title}</span>
+              </div>
+              <p style={styles.modalText}>{selectedRiskInfo.description}</p>
+              <p style={styles.modalText}>
+                This module has priority score <strong>{selectedRisk.priority_score}</strong>, severity score <strong>{selectedRisk.severity_score}</strong>, bug count <strong>{selectedRisk.bug_count}</strong>, and reopen count <strong>{selectedRisk.reopen_count}</strong>.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }
@@ -191,4 +241,16 @@ const styles = {
   th: { padding: '10px 16px', textAlign: 'left', fontWeight: 600, color: '#555', borderBottom: '1px solid #e5e5e3', whiteSpace: 'nowrap', background: '#fafafa' },
   td: { padding: '10px 16px', color: '#333', borderBottom: '1px solid #f0f0ee' },
   badge: { padding: '2px 10px', borderRadius: 10, fontSize: 12, fontWeight: 600 },
+  riskCell: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  riskInfoBtn: { border: '1px solid #d8dee8', background: '#fff', color: '#185FA5', borderRadius: 999, padding: '4px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer' },
+  modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 1000 },
+  modalCard: { width: '100%', maxWidth: 560, background: '#fff', borderRadius: 16, boxShadow: '0 24px 80px rgba(15, 23, 42, 0.2)', padding: 24 },
+  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 18 },
+  modalEyebrow: { fontSize: 12, fontWeight: 700, color: '#185FA5', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 },
+  modalTitle: { margin: 0, fontSize: 22, lineHeight: 1.2, color: '#1a1a1a' },
+  modalCloseBtn: { border: '1px solid #d8dee8', background: '#fff', color: '#444', borderRadius: 10, padding: '8px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  modalBody: { display: 'grid', gap: 14 },
+  modalRiskRow: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  modalRiskTitle: { fontSize: 16, fontWeight: 700, color: '#1f2937' },
+  modalText: { margin: 0, fontSize: 14, lineHeight: 1.6, color: '#475467' },
 };
